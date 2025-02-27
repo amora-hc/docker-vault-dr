@@ -1,0 +1,163 @@
+# https://taskfile.dev
+version: '3'
+
+env:
+  VAULT_ADDR_A: http://localhost:8200
+  VAULT_ADDR_B: http://localhost:8220
+
+tasks:
+  all:
+    cmds:
+      - task: up
+      - task: init_a
+      - task: init_b
+      - task: unseal_a
+      - task: unseal_b
+      - task: status_a
+      - task: status_b
+      - task: ui
+
+  up:
+    preconditions:
+      - test -f docker-compose.yml
+      - docker info
+    cmds:
+      - docker compose up -d --pull=missing
+      - sleep 5
+      - |
+        echo "Vault cluster A: {{ .VAULT_ADDR_A }}"
+        echo "Vault cluster B: {{ .VAULT_ADDR_B }}"
+    silent: true
+
+  down:
+    cmds:
+      - task: stop
+
+  init_a:
+    cmds:
+      - vault operator init -format=json -address={{ .VAULT_ADDR_A }} -key-shares=1 -key-threshold=1 > ./cluster_a/init.json
+
+  init_b:
+    cmds:
+      - vault operator init -format=json -address={{ .VAULT_ADDR_B }} -key-shares=1 -key-threshold=1 > ./cluster_b/init.json
+
+  unseal_a:
+    vars:
+      VAULT_UNSEAL_KEY_A:
+        sh: cat ./cluster_a/init.json | jq -r '.unseal_keys_b64[0]'
+      VAULT_ROOT_TOKEN_A:
+        sh: cat ./cluster_a/init.json | jq -r '.root_token'  
+    cmds:
+      #- echo "{{.VAULT_UNSEAL_KEY_A}}"
+      - vault operator unseal {{.VAULT_UNSEAL_KEY_A}}
+      - |
+        echo "Root token: {{.VAULT_ROOT_TOKEN_A}}"
+    env:
+      VAULT_ADDR: '{{.VAULT_ADDR_A}}'
+
+  unseal_b:
+    vars:
+      VAULT_UNSEAL_KEY_B:
+        sh: cat ./cluster_b/init.json | jq -r '.unseal_keys_b64[0]'
+      VAULT_ROOT_TOKEN_B:
+        sh: cat ./cluster_b/init.json | jq -r '.root_token'  
+    cmds:
+      #- echo "{{.VAULT_UNSEAL_KEY_B}}"
+      - vault operator unseal {{.VAULT_UNSEAL_KEY_B}}
+      - |
+        echo "Root token: {{.VAULT_ROOT_TOKEN_B}}"
+    env:
+      VAULT_ADDR: '{{.VAULT_ADDR_B}}'
+
+  restart:
+    cmds:
+      - docker compose restart vault_cluster_a vault_cluster_b
+
+  rebuild:
+    cmds:
+      - task: clean
+      - task: all
+
+  status_a:
+    cmds:
+      - vault status
+    env:
+      VAULT_ADDR: '{{.VAULT_ADDR_A}}'
+    ignore_error: true
+
+  status_b:
+    cmds:
+      - vault status
+    env:
+      VAULT_ADDR: '{{.VAULT_ADDR_B}}'
+    ignore_error: true
+
+  backup_a:
+    cmds:
+      - vault operator raft snapshot save backup-`date +"%Y%m%d-%H%M"`.snap
+    env:
+      VAULT_ADDR: '{{.VAULT_ADDR_A}}'  
+
+  backup_b:
+    cmds:
+      - vault operator raft snapshot save backup-`date +"%Y%m%d-%H%M"`.snap
+    env:
+      VAULT_ADDR: '{{.VAULT_ADDR_B}}'  
+  
+  rm:
+    aliases: ["clean"]
+    cmds:
+      - docker compose rm -sfv
+      - docker compose down --volumes
+    ignore_error: true
+
+  logs_a:
+    cmds:
+      - docker compose logs -f vault_cluster_a
+
+  logs_b:
+    cmds:
+      - docker compose logs -f vault_cluster_b
+
+  stop:
+    cmds:
+      - docker compose stop
+  
+  ui:
+    cmds:
+      - open http://localhost:8200
+      - open http://localhost:8220
+
+  setup:
+    cmds:
+      - ./scripts/30_vault_rep_enable_a.sh
+      - ./scripts/40_vault_rep_enable_b.sh
+      - ./scripts/50_vault_rep_confirm.sh
+
+  failover:
+    cmds:
+      - ./scripts/60_vault_failover.sh
+      - ./scripts/70_vault_promote_b.sh
+      - ./scripts/80_vault_demote_a.sh
+      - ./scripts/90_vault_test_failover.sh
+      - ./scripts/100_vault_rep_enable_dr.sh
+
+  failback:
+    cmds:
+      - ./scripts/110_vault_failback.sh
+      - ./scripts/120_vault_promote_a.sh
+      - ./scripts/130_vault_demote_b.sh
+      - ./scripts/140_vault_test_failback.sh
+      - ./scripts/150_vault_new_rep.sh
+
+  replication_status_a:
+    cmds:
+      - vault read sys/replication/dr/status
+    env:
+      VAULT_ADDR: '{{.VAULT_ADDR_A}}'
+  
+  replication_status_b:
+    cmds:
+      - vault read sys/replication/dr/status
+    env:
+      VAULT_ADDR: '{{.VAULT_ADDR_B}}'  

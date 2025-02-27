@@ -1,0 +1,4 @@
+**/*.env
+**/init.json
+**/*.snap
+**/*_token

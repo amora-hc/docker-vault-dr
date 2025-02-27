@@ -1,0 +1,43 @@
+services:
+  vault_cluster_a:
+    image: hashicorp/vault-enterprise:1.18-ent
+    container_name: ${COMPOSE_PROJECT_NAME}_cluster_a
+    restart: no
+    ports:
+      - "8200:8200"
+    env_file:
+      - a.env # Contains VAULT_ADDR, VAULT_LICENSE
+    volumes:
+      - ./cluster_a/config/raft.hcl:/vault/config/raft.hcl:ro
+      - cluster_a-data:/vault/file  # Need this volume to fudge permissions error
+      - cluster_a-logs:/vault/logs
+    cap_add:
+      - IPC_LOCK
+    command: server
+
+  vault_cluster_b:
+    image: hashicorp/vault-enterprise:1.18-ent
+    container_name: ${COMPOSE_PROJECT_NAME}_cluster_b
+    restart: no
+    ports:
+      - "8220:8220"
+    env_file:
+      - b.env # Contains VAULT_ADDR, VAULT_LICENSE
+    cap_add:
+      - IPC_LOCK
+    volumes:
+      - ./cluster_b/config/raft.hcl:/vault/config/raft.hcl:ro
+      - cluster_b-data:/vault/file  # Need this volume to fudge permissions error
+      - cluster_b-logs:/vault/logs
+      #- ./entrypoint.sh:/entrypoint.sh
+    command: server
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME}
+
+volumes:
+  cluster_a-data:
+  cluster_a-logs:
+  cluster_b-data:
+  cluster_b-logs:
