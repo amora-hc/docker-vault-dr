@@ -17,4 +17,5 @@ vault write sys/replication/dr/secondary/update-primary \
 echo "Check replication status on SECONDARY (cluster_b)"
 sleep 5
 echo
+set -xe
 vault read sys/replication/dr/status

@@ -5,5 +5,8 @@ export DR_SECONDARY_TOKEN="$(cat ./secondary_token)"
 
 echo "Enabling cluster replication on SECONDARY (cluster_b)"
 sleep 3
+set -xe
 vault write sys/replication/dr/secondary/enable token=$DR_SECONDARY_TOKEN
+{ set +x; } 2>/dev/null
+set +e
 echo "Cluster replication enabled on SECONDARY (cluster_b)"

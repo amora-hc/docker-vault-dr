@@ -4,4 +4,5 @@ export VAULT_TOKEN="$(cat ./cluster_a/init.json | jq -r '.root_token')"
 
 echo "Demote PRIMARY to SECONDARY (cluster_b)"
 sleep 2
+set -xe
 vault write -f sys/replication/dr/primary/demote
