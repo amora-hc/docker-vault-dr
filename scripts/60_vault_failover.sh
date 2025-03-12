@@ -6,7 +6,10 @@ export VAULT_TOKEN="$(cat ./cluster_a/init.json | jq -r '.root_token')"
 
 echo "Taking snapshot of PRIMARY data (cluster_a)"
 sleep 3
+set -x
 vault operator raft snapshot save cluster_a/vault-cluster-a-snapshot.snap
+{ set +x; } 2>/dev/null
+set +e
 echo
 echo "Confirming snapshot has been created..."
 sleep 1
@@ -37,20 +40,18 @@ EOF
 echo
 echo "Creating failover token role on PRIMARY (cluster_a)"
 sleep 3
+set -x
 vault write auth/token/roles/failover-handler \
     allowed_policies=dr-secondary-promotion \
     orphan=true \
     renewable=false \
     token_type=batch
+{ set +x; } 2>/dev/null
+set +e
 
 echo
-echo "Creating DR failover token..."
+echo "Creating and exporting DR operation token to file"
 sleep 3
-vault token create \
-   -role=failover-handler -ttl=8h
-
-echo
-echo "Exporting DR operation token to file"
-sleep 3
+set -xe
 vault token create \
     -field=token -role=failover-handler -ttl=8h > ./operation_token

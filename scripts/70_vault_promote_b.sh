@@ -4,5 +4,6 @@ export DR_OPERATION_TOKEN="$(cat ./operation_token)"
 
 echo "Promote cluster_b to PRIMARY"
 sleep 2
+set -xe
 vault write -f sys/replication/dr/secondary/promote \
     dr_operation_token=$DR_OPERATION_TOKEN
